@@ -12,12 +12,12 @@ Trois GitHub Actions automatisent le cycle de vie des instances :
 
 | Workflow | Rôle |
 | --- | --- |
-| `check-metabase-release.yml` | Vérifie chaque jour s'il existe une nouvelle version de [Metabase](https://github.com/metabase/metabase/releases). Si oui, liste tous les environnements `metabase-*` et déclenche `deploy.yml` pour chacun. |
+| `check-metabase-release.yml` | Vérifie chaque jour s'il existe une nouvelle version de [Metabase](https://github.com/metabase/metabase/releases). Si oui, liste tous les environnements GitHub du dépôt et déclenche `deploy.yml` pour chacun. |
 | `deploy.yml` | Pousse le code vers l'app Scalingo de la SE ciblée pour forcer un redéploiement. Nécessite une **validation manuelle** par les reviewers de l'environnement concerné. |
 | `sync-upstream.yml` | Vérifie chaque semaine si le dépôt d'origine (`Scalingo/metabase-scalingo`) a de nouveaux commits (buildpack, configuration…) et ouvre une PR si besoin. |
 
-Chaque SE dispose de son propre environnement GitHub, nommé `metabase-<slug>`
-(par exemple `metabase-qfdmo`), qui porte :
+Chaque SE dispose de son propre environnement GitHub, nommé `<slug>`
+(par exemple `quefairedemesobjetsetdechets`), qui porte :
 - ses propres secrets (`SCALINGO_SSH_PRIVATE_KEY`, `SCALINGO_GIT_REMOTE`) pointant vers son app Scalingo,
 - ses propres reviewers, chargés de valider les déploiements de leur instance,
 - sa propre variable `LAST_DEPLOYED_METABASE_VERSION`, pour ne redéployer que si une nouvelle version est disponible.
@@ -31,12 +31,15 @@ sa propre app Scalingo via `SCALINGO_GIT_REMOTE`.
 Ces étapes sont à réaliser par la SE qui souhaite héberger sa propre instance
 Metabase.
 
+⚠️ Tout environnement GitHub créé sur ce dépôt est considéré comme une SE à
+déployer : ne pas créer d'environnement pour un autre usage.
+
 ### 1. Créer l'application sur Scalingo
 
 ```bash
-scalingo create metabase-<slug>
-scalingo --app metabase-<slug> addons-add postgresql postgresql-starter-512
-scalingo --app metabase-<slug> env-set 'BUILDPACK_URL=https://github.com/Scalingo/multi-buildpack'
+scalingo create <slug>
+scalingo --app <slug> addons-add postgresql postgresql-starter-512
+scalingo --app <slug> env-set 'BUILDPACK_URL=https://github.com/Scalingo/multi-buildpack'
 ```
 
 ### 2. Générer une clé SSH dédiée au déploiement automatique
@@ -46,15 +49,15 @@ déploiement à un compte individuel. Cette étape peut être mutualisée entre 
 si une clé de déploiement partagée existe déjà pour ce dépôt.
 
 ```bash
-ssh-keygen -t ed25519 -f ~/.ssh/scalingo_deploy_ci -N "" -C "github-actions-metabase-<slug>"
+ssh-keygen -t ed25519 -f ~/.ssh/scalingo_deploy_ci -N "" -C "github-actions-<slug>"
 scalingo login
-scalingo keys-add github-actions-metabase-<slug> ~/.ssh/scalingo_deploy_ci.pub
+scalingo keys-add github-actions-<slug> ~/.ssh/scalingo_deploy_ci.pub
 ```
 
-### 3. Créer l'environnement GitHub `metabase-<slug>` avec validation obligatoire
+### 3. Créer l'environnement GitHub `<slug>` avec validation obligatoire
 
 ```bash
-gh api repos/<owner>/<repo>/environments/metabase-<slug> -X PUT --input - <<EOF
+gh api repos/<owner>/<repo>/environments/<slug> -X PUT --input - <<EOF
 {
   "reviewers": [
     {"type": "User", "id": <id_github_reviewer_1>},
@@ -73,9 +76,9 @@ gh api users/<login> --jq .id
 ### 4. Configurer les secrets et la variable de version, scopés à cet environnement
 
 ```bash
-gh secret set SCALINGO_SSH_PRIVATE_KEY --repo <owner>/<repo> --env metabase-<slug> < ~/.ssh/scalingo_deploy_ci
-gh secret set SCALINGO_GIT_REMOTE --repo <owner>/<repo> --env metabase-<slug> --body "git@ssh.osc-secnum-fr1.scalingo.com:metabase-<slug>.git"
-gh variable set LAST_DEPLOYED_METABASE_VERSION --repo <owner>/<repo> --env metabase-<slug> --body "v0.0.0"
+gh secret set SCALINGO_SSH_PRIVATE_KEY --repo <owner>/<repo> --env <slug> < ~/.ssh/scalingo_deploy_ci
+gh secret set SCALINGO_GIT_REMOTE --repo <owner>/<repo> --env <slug> --body "git@ssh.osc-secnum-fr1.scalingo.com:<slug>.git"
+gh variable set LAST_DEPLOYED_METABASE_VERSION --repo <owner>/<repo> --env <slug> --body "v0.0.0"
 ```
 
 Puis supprimer la clé privée locale, elle n'a plus besoin d'exister que dans
@@ -96,7 +99,7 @@ Pour forcer un redéploiement sur une SE donnée sans attendre la vérification
 quotidienne :
 
 ```bash
-gh workflow run deploy.yml --repo <owner>/<repo> -f environment=metabase-<slug>
+gh workflow run deploy.yml --repo <owner>/<repo> -f environment=<slug>
 ```
 
 ## Variables d'environnement de l'application
