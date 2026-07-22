@@ -41,51 +41,11 @@ scalingo --app <slug> addons-add postgresql postgresql-starter-512
 scalingo --app <slug> env-set 'BUILDPACK_URL=https://github.com/Scalingo/multi-buildpack'
 ```
 
-### 2. Générer une clé SSH dédiée au déploiement automatique
+### 2. Demander à un admin d'ajouter votre app Scalingo sous forme d'environnement GitHub
 
-Ne pas réutiliser une clé SSH personnelle : une clé dédiée évite de lier le
-déploiement à un compte individuel. Cette étape peut être mutualisée entre SE
-si une clé de déploiement partagée existe déjà pour ce dépôt.
-
-```bash
-ssh-keygen -t ed25519 -f ~/.ssh/scalingo_deploy_ci -N "" -C "github-actions-<slug>"
-scalingo login
-scalingo keys-add github-actions-<slug> ~/.ssh/scalingo_deploy_ci.pub
-```
-
-### 3. Créer l'environnement GitHub `<slug>` avec validation obligatoire
-
-```bash
-gh api repos/<owner>/<repo>/environments/<slug> -X PUT --input - <<EOF
-{
-  "reviewers": [
-    {"type": "User", "id": <id_github_reviewer_1>},
-    {"type": "User", "id": <id_github_reviewer_2>}
-  ]
-}
-EOF
-```
-
-L'identifiant numérique d'un utilisateur GitHub s'obtient avec :
-
-```bash
-gh api users/<login> --jq .id
-```
-
-### 4. Configurer les secrets et la variable de version, scopés à cet environnement
-
-```bash
-gh secret set SCALINGO_SSH_PRIVATE_KEY --repo <owner>/<repo> --env <slug> < ~/.ssh/scalingo_deploy_ci
-gh secret set SCALINGO_GIT_REMOTE --repo <owner>/<repo> --env <slug> --body "git@ssh.osc-secnum-fr1.scalingo.com:<slug>.git"
-gh variable set LAST_DEPLOYED_METABASE_VERSION --repo <owner>/<repo> --env <slug> --body "v0.0.0"
-```
-
-Puis supprimer la clé privée locale, elle n'a plus besoin d'exister que dans
-le secret GitHub :
-
-```bash
-rm ~/.ssh/scalingo_deploy_ci
-```
+Un admin du dépôt doit créer l'environnement `<slug>`, y ajouter les
+reviewers de la SE, et configurer les secrets (`SCALINGO_SSH_PRIVATE_KEY`,
+`SCALINGO_GIT_REMOTE`) et la variable `LAST_DEPLOYED_METABASE_VERSION`.
 
 À partir de là, la SE est autonome : chaque jour, si une nouvelle version de
 Metabase est disponible, un déploiement sera proposé et attendra la
