@@ -15,7 +15,7 @@ permissions:
   actions: write
 
 jobs:
-  discover:
+  check-release:
     runs-on: ubuntu-latest
     outputs:
       environments: ${{ steps.list.outputs.environments }}
@@ -42,14 +42,24 @@ jobs:
           fi
           echo "environments=$envs" >> "$GITHUB_OUTPUT"
 
+      - name: Announce release and targets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo "### Metabase ${{ steps.latest.outputs.tag }} — targets: ${{ steps.list.outputs.environments }}"
+            echo
+            gh api "repos/metabase/metabase/releases/tags/${{ steps.latest.outputs.tag }}" --jq .body
+          } >> "$GITHUB_STEP_SUMMARY"
+
   deploy:
-    needs: discover
-    if: needs.discover.outputs.environments != '[]'
+    needs: check-release
+    if: needs.check-release.outputs.environments != '[]'
     runs-on: ubuntu-latest
     environment: ${{ matrix.environment }}
     strategy:
       matrix:
-        environment: ${{ fromJson(needs.discover.outputs.environments) }}
+        environment: ${{ fromJson(needs.check-release.outputs.environments) }}
     steps:
       - name: Compare against last deployed version for this SE
         id: compare
@@ -63,24 +73,13 @@ jobs:
           last=$(gh api "repos/${{ github.repository }}/environments/${{ matrix.environment }}/variables/LAST_DEPLOYED_METABASE_VERSION" \
             --jq .value 2>/dev/null || echo "")
           echo "Environment: ${{ matrix.environment }}"
-          echo "Latest release: ${{ needs.discover.outputs.latest }}"
+          echo "Latest release: ${{ needs.check-release.outputs.latest }}"
           echo "Last deployed:  $last"
-          if [ "$last" != "${{ needs.discover.outputs.latest }}" ]; then
+          if [ "$last" != "${{ needs.check-release.outputs.latest }}" ]; then
             echo "new=true" >> "$GITHUB_OUTPUT"
           else
             echo "new=false" >> "$GITHUB_OUTPUT"
           fi
-
-      - name: Announce attempt with changelog
-        if: steps.compare.outputs.new == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          {
-            echo "### Deploy attempt: ${{ needs.discover.outputs.latest }} → ${{ matrix.environment }}"
-            echo
-            gh api "repos/metabase/metabase/releases/tags/${{ needs.discover.outputs.latest }}" --jq .body
-          } >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/checkout@v4
         if: steps.compare.outputs.new == 'true'
@@ -110,8 +109,4 @@ jobs:
         if: steps.compare.outputs.new == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh variable set LAST_DEPLOYED_METABASE_VERSION --env "${{ matrix.environment }}" --body "${{ needs.discover.outputs.latest }}"
-
-      - name: Summary
-        if: steps.compare.outputs.new == 'true'
-        run: echo "Deployed Metabase \`${{ needs.discover.outputs.latest }}\` to \`${{ matrix.environment }}\`" >> "$GITHUB_STEP_SUMMARY"
+        run: gh variable set LAST_DEPLOYED_METABASE_VERSION --env "${{ matrix.environment }}" --body "${{ needs.check-release.outputs.latest }}"
