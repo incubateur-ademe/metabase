@@ -43,15 +43,6 @@ Metabase est disponible, un déploiement sera proposé et attendra la
 validation d'un des reviewers de son environnement, depuis l'onglet Actions
 du dépôt.
 
-### Mettre à jour manuellement
-
-Pour forcer un redéploiement sur votre SE sans attendre la vérification
-quotidienne :
-
-```bash
-gh workflow run check-metabase-release.yml --repo <owner>/<repo> -f environment=<slug>
-```
-
 ## Fonctionnement du dépôt
 
 Deux GitHub Actions automatisent le cycle de vie des instances :
@@ -74,10 +65,4 @@ distingue une app d'une autre.
 
 ## Variables d'environnement de l'application
 
-| Nom | Description | Valeur par défaut |
-| --- | --- | --- |
-| `BUILDPACK_URL` | Buildpack utilisé pour le déploiement | `https://github.com/Scalingo/multi-buildpack.git` |
-| `DATABASE_URL` | URL de l'addon PostgreSQL (fournie automatiquement par Scalingo) | - |
-| `MAX_METASPACE_SIZE` | Mémoire maximale allouée au Metaspace Java | `512m` |
-
-Metabase supporte également de nombreuses [variables d'environnement propres à l'application](https://www.metabase.com/docs/latest/operations-guide/environment-variables.html).
+Voir [Scalingo/metabase-scalingo](https://github.com/Scalingo/metabase-scalingo).
