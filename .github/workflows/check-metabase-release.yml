@@ -57,6 +57,17 @@ jobs:
             echo "new=false" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Announce attempt with changelog
+        if: steps.compare.outputs.new == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo "### Deploy attempt: ${{ needs.discover.outputs.latest }} → ${{ matrix.environment }}"
+            echo
+            gh api "repos/metabase/metabase/releases/tags/${{ needs.discover.outputs.latest }}" --jq .body
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Trigger deploy workflow for this SE
         if: steps.compare.outputs.new == 'true'
         env:
