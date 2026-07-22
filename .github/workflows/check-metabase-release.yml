@@ -1,0 +1,41 @@
+name: Check for new Metabase release
+
+on:
+  schedule:
+    - cron: '13 7 * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get latest Metabase release tag
+        id: latest
+        run: |
+          tag=$(gh api repos/metabase/metabase/releases/latest --jq .tag_name)
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Compare against last deployed version
+        id: compare
+        run: |
+          last="${{ vars.LAST_DEPLOYED_METABASE_VERSION }}"
+          echo "Latest release: ${{ steps.latest.outputs.tag }}"
+          echo "Last deployed:  $last"
+          if [ "$last" != "${{ steps.latest.outputs.tag }}" ]; then
+            echo "new=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "new=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Trigger deploy workflow
+        if: steps.compare.outputs.new == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run deploy.yml -f version="${{ steps.latest.outputs.tag }}"
