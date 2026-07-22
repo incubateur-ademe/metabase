@@ -1,0 +1,49 @@
+name: Sync from upstream fork
+
+on:
+  schedule:
+    - cron: '26 6 * * 1'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  UPSTREAM_REPO: https://github.com/Scalingo/metabase-scalingo.git
+  UPSTREAM_BRANCH: master
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch upstream
+        run: git fetch "$UPSTREAM_REPO" "$UPSTREAM_BRANCH"
+
+      - name: Check for new upstream commits
+        id: check
+        run: |
+          if git merge-base --is-ancestor FETCH_HEAD HEAD; then
+            echo "ahead=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ahead=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Open PR with upstream changes
+        if: steps.check.outputs.ahead == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          branch="sync-upstream-$(date +%Y%m%d)"
+          git checkout -b "$branch"
+          git merge FETCH_HEAD --no-edit
+          git push origin "$branch"
+          gh pr create \
+            --title "Sync with upstream (Scalingo/metabase-scalingo)" \
+            --body "Automated sync of new commits from the upstream fork." \
+            --base master \
+            --head "$branch"
