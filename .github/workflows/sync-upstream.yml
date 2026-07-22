@@ -1,4 +1,4 @@
-name: Sync from upstream fork
+name: 🔀 Sync from upstream fork
 
 on:
   schedule:
@@ -21,10 +21,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Fetch upstream
+      - name: ⬇️ Fetch upstream
         run: git fetch "$UPSTREAM_REPO" "$UPSTREAM_BRANCH"
 
-      - name: Check for new upstream commits
+      - name: 🔎 Check for new upstream commits
         id: check
         run: |
           if git merge-base --is-ancestor FETCH_HEAD HEAD; then
@@ -33,7 +33,7 @@ jobs:
             echo "ahead=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Open PR with upstream changes
+      - name: 📬 Open PR with upstream changes
         if: steps.check.outputs.ahead == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -45,5 +45,5 @@ jobs:
           gh pr create \
             --title "Sync with upstream (Scalingo/metabase-scalingo)" \
             --body "Automated sync of new commits from the upstream fork." \
-            --base master \
+            --base main \
             --head "$branch"

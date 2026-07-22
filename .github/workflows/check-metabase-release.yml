@@ -1,4 +1,4 @@
-name: Check for new Metabase release
+name: 🔄 Check for new Metabase release
 
 on:
   schedule:
@@ -21,7 +21,7 @@ jobs:
       environments: ${{ steps.list.outputs.environments }}
       latest: ${{ steps.latest.outputs.tag }}
     steps:
-      - name: Get latest Metabase release tag
+      - name: 🔍 Get latest Metabase release tag
         id: latest
         env:
           GH_TOKEN: ${{ github.token }}
@@ -29,7 +29,7 @@ jobs:
           tag=$(gh api repos/metabase/metabase/releases/latest --jq .tag_name)
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
-      - name: List SE deploy environments
+      - name: 📋 List SE deploy environments
         id: list
         env:
           GH_TOKEN: ${{ github.token }}
@@ -42,7 +42,7 @@ jobs:
           fi
           echo "environments=$envs" >> "$GITHUB_OUTPUT"
 
-      - name: Announce release and targets
+      - name: 📣 Announce release and targets
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -61,7 +61,7 @@ jobs:
       matrix:
         environment: ${{ fromJson(needs.check-release.outputs.environments) }}
     steps:
-      - name: Compare against last deployed version for this SE
+      - name: ⚖️ Compare against last deployed version for this SE
         id: compare
         env:
           GH_TOKEN: ${{ github.token }}
@@ -86,7 +86,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up Scalingo SSH deploy key
+      - name: 🔑 Set up Scalingo SSH deploy key
         if: steps.compare.outputs.new == 'true'
         run: |
           mkdir -p ~/.ssh
@@ -99,13 +99,13 @@ jobs:
             echo "  IdentitiesOnly yes"
           } >> ~/.ssh/config
 
-      - name: Push to Scalingo to trigger redeploy
+      - name: 🚀 Push to Scalingo to trigger redeploy
         if: steps.compare.outputs.new == 'true'
         run: |
           git remote add scalingo "${{ secrets.SCALINGO_GIT_REMOTE }}"
           git push scalingo HEAD:master --force
 
-      - name: Record deployed version
+      - name: ✅ Record deployed version
         if: steps.compare.outputs.new == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
