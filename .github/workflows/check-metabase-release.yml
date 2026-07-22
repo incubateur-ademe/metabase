@@ -63,5 +63,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh workflow run deploy.yml \
+            --repo "${{ github.repository }}" \
             -f environment="${{ matrix.environment }}" \
             -f version="${{ needs.discover.outputs.latest }}"
