@@ -47,3 +47,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh variable set LAST_DEPLOYED_METABASE_VERSION --env "${{ inputs.environment }}" --body "${{ inputs.version }}"
+
+      - name: Summary
+        run: echo "Deployed Metabase \`${{ inputs.version }}\` to \`${{ inputs.environment }}\`" >> "$GITHUB_STEP_SUMMARY"
