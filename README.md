@@ -12,8 +12,7 @@ Trois GitHub Actions automatisent le cycle de vie des instances :
 
 | Workflow | Rôle |
 | --- | --- |
-| `check-metabase-release.yml` | Vérifie chaque jour s'il existe une nouvelle version de [Metabase](https://github.com/metabase/metabase/releases). Si oui, liste tous les environnements GitHub du dépôt et déclenche `deploy.yml` pour chacun. |
-| `deploy.yml` | Pousse le code vers l'app Scalingo de la SE ciblée pour forcer un redéploiement. Nécessite une **validation manuelle** par les reviewers de l'environnement concerné. |
+| `check-metabase-release.yml` | Vérifie chaque jour s'il existe une nouvelle version de [Metabase](https://github.com/metabase/metabase/releases). Si oui, déclenche un déploiement pour chaque environnement GitHub du dépôt (un job par SE, dans la même exécution). Chaque déploiement pousse le code vers l'app Scalingo de la SE ciblée et nécessite une **validation manuelle** par les reviewers de son environnement — plusieurs SE en attente peuvent être approuvées depuis le même écran d'exécution. |
 | `sync-upstream.yml` | Vérifie chaque semaine si le dépôt d'origine (`Scalingo/metabase-scalingo`) a de nouveaux commits (buildpack, configuration…) et ouvre une PR si besoin. |
 
 Chaque SE dispose de son propre environnement GitHub, nommé `<slug>`
@@ -99,7 +98,7 @@ Pour forcer un redéploiement sur une SE donnée sans attendre la vérification
 quotidienne :
 
 ```bash
-gh workflow run deploy.yml --repo <owner>/<repo> -f environment=<slug>
+gh workflow run check-metabase-release.yml --repo <owner>/<repo> -f environment=<slug>
 ```
 
 ## Variables d'environnement de l'application

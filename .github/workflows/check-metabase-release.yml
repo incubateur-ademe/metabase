@@ -3,7 +3,12 @@ name: Check for new Metabase release
 on:
   schedule:
     - cron: '13 7 * * *'
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Redeploy only this environment (leave empty to check all SEs)
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -29,14 +34,19 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          envs=$(gh api "repos/${{ github.repository }}/environments" --paginate \
-            --jq '[.environments[].name]')
+          if [ -n "${{ inputs.environment }}" ]; then
+            envs='["${{ inputs.environment }}"]'
+          else
+            envs=$(gh api "repos/${{ github.repository }}/environments" --paginate \
+              --jq '[.environments[].name]')
+          fi
           echo "environments=$envs" >> "$GITHUB_OUTPUT"
 
-  trigger:
+  deploy:
     needs: discover
     if: needs.discover.outputs.environments != '[]'
     runs-on: ubuntu-latest
+    environment: ${{ matrix.environment }}
     strategy:
       matrix:
         environment: ${{ fromJson(needs.discover.outputs.environments) }}
@@ -46,6 +56,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          if [ -n "${{ inputs.environment }}" ]; then
+            echo "new=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           last=$(gh api "repos/${{ github.repository }}/environments/${{ matrix.environment }}/variables/LAST_DEPLOYED_METABASE_VERSION" \
             --jq .value 2>/dev/null || echo "")
           echo "Environment: ${{ matrix.environment }}"
@@ -68,12 +82,36 @@ jobs:
             gh api "repos/metabase/metabase/releases/tags/${{ needs.discover.outputs.latest }}" --jq .body
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Trigger deploy workflow for this SE
+      - uses: actions/checkout@v4
+        if: steps.compare.outputs.new == 'true'
+        with:
+          fetch-depth: 0
+
+      - name: Set up Scalingo SSH deploy key
+        if: steps.compare.outputs.new == 'true'
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SCALINGO_SSH_PRIVATE_KEY }}" > ~/.ssh/id_scalingo
+          chmod 600 ~/.ssh/id_scalingo
+          ssh-keyscan -t rsa,ecdsa,ed25519 ssh.osc-secnum-fr1.scalingo.com >> ~/.ssh/known_hosts
+          {
+            echo "Host ssh.osc-secnum-fr1.scalingo.com"
+            echo "  IdentityFile ~/.ssh/id_scalingo"
+            echo "  IdentitiesOnly yes"
+          } >> ~/.ssh/config
+
+      - name: Push to Scalingo to trigger redeploy
+        if: steps.compare.outputs.new == 'true'
+        run: |
+          git remote add scalingo "${{ secrets.SCALINGO_GIT_REMOTE }}"
+          git push scalingo HEAD:master --force
+
+      - name: Record deployed version
         if: steps.compare.outputs.new == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          gh workflow run deploy.yml \
-            --repo "${{ github.repository }}" \
-            -f environment="${{ matrix.environment }}" \
-            -f version="${{ needs.discover.outputs.latest }}"
+        run: gh variable set LAST_DEPLOYED_METABASE_VERSION --env "${{ matrix.environment }}" --body "${{ needs.discover.outputs.latest }}"
+
+      - name: Summary
+        if: steps.compare.outputs.new == 'true'
+        run: echo "Deployed Metabase \`${{ needs.discover.outputs.latest }}\` to \`${{ matrix.environment }}\`" >> "$GITHUB_STEP_SUMMARY"
