@@ -110,3 +110,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh variable set LAST_DEPLOYED_METABASE_VERSION --env "${{ matrix.environment }}" --body "${{ needs.check-release.outputs.latest }}"
+
+      - name: 🔗 Report deployment URL
+        if: steps.compare.outputs.new == 'true'
+        run: |
+          remote="${{ secrets.SCALINGO_GIT_REMOTE }}"
+          # remote looks like git@ssh.<region>.scalingo.com:<app-name>.git
+          app=$(echo "$remote" | sed -E 's#.*:([^/]+)\.git#\1#')
+          region=$(echo "$remote" | sed -E 's#git@ssh\.([^.]+)\..*#\1#')
+          echo "### ${{ matrix.environment }}: https://${app}.${region}.scalingo.io" >> "$GITHUB_STEP_SUMMARY"
