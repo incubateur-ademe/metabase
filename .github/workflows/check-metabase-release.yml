@@ -10,32 +10,58 @@ permissions:
   actions: write
 
 jobs:
-  check:
+  discover:
     runs-on: ubuntu-latest
+    outputs:
+      environments: ${{ steps.list.outputs.environments }}
+      latest: ${{ steps.latest.outputs.tag }}
     steps:
       - name: Get latest Metabase release tag
         id: latest
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           tag=$(gh api repos/metabase/metabase/releases/latest --jq .tag_name)
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: List SE deploy environments (metabase-*)
+        id: list
         env:
           GH_TOKEN: ${{ github.token }}
-
-      - name: Compare against last deployed version
-        id: compare
         run: |
-          last="${{ vars.LAST_DEPLOYED_METABASE_VERSION }}"
-          echo "Latest release: ${{ steps.latest.outputs.tag }}"
+          envs=$(gh api "repos/${{ github.repository }}/environments" --paginate \
+            --jq '[.environments[].name | select(startswith("metabase-"))]')
+          echo "environments=$envs" >> "$GITHUB_OUTPUT"
+
+  trigger:
+    needs: discover
+    if: needs.discover.outputs.environments != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        environment: ${{ fromJson(needs.discover.outputs.environments) }}
+    steps:
+      - name: Compare against last deployed version for this SE
+        id: compare
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          last=$(gh api "repos/${{ github.repository }}/environments/${{ matrix.environment }}/variables/LAST_DEPLOYED_METABASE_VERSION" \
+            --jq .value 2>/dev/null || echo "")
+          echo "Environment: ${{ matrix.environment }}"
+          echo "Latest release: ${{ needs.discover.outputs.latest }}"
           echo "Last deployed:  $last"
-          if [ "$last" != "${{ steps.latest.outputs.tag }}" ]; then
+          if [ "$last" != "${{ needs.discover.outputs.latest }}" ]; then
             echo "new=true" >> "$GITHUB_OUTPUT"
           else
             echo "new=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Trigger deploy workflow
+      - name: Trigger deploy workflow for this SE
         if: steps.compare.outputs.new == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh workflow run deploy.yml -f version="${{ steps.latest.outputs.tag }}"
+          gh workflow run deploy.yml \
+            -f environment="${{ matrix.environment }}" \
+            -f version="${{ needs.discover.outputs.latest }}"
