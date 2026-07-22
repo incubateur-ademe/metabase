@@ -105,11 +105,6 @@ jobs:
           git remote add scalingo "${{ secrets.SCALINGO_GIT_REMOTE }}"
           git push scalingo HEAD:master --force
 
-      - name: ✅ Record deployed version
-        if: steps.compare.outputs.new == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh variable set LAST_DEPLOYED_METABASE_VERSION --env "${{ matrix.environment }}" --body "${{ needs.check-release.outputs.latest }}"
 
       - name: 🔗 Report deployment URL
         if: steps.compare.outputs.new == 'true'
