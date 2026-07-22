@@ -8,7 +8,7 @@ forker : chaque SE ajoute un environnement GitHub dédié, et le déploiement se
 fait via un buildpack qui récupère Metabase à chaque déploiement — il n'y a
 pas de code applicatif à compiler dans ce dépôt.
 
-Trois GitHub Actions automatisent le cycle de vie des instances :
+Deux GitHub Actions automatisent le cycle de vie des instances :
 
 | Workflow | Rôle |
 | --- | --- |
