@@ -3,6 +3,10 @@ name: Deploy to Scalingo
 on:
   workflow_dispatch:
     inputs:
+      environment:
+        description: Target GitHub environment (one per SE)
+        required: true
+        type: string
       version:
         description: Metabase release tag that triggered this deploy
         required: false
@@ -15,7 +19,7 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: metabase
+    environment: ${{ inputs.environment }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -42,4 +46,4 @@ jobs:
         if: inputs.version != 'manual'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh variable set LAST_DEPLOYED_METABASE_VERSION --body "${{ inputs.version }}"
+        run: gh variable set LAST_DEPLOYED_METABASE_VERSION --env "${{ inputs.environment }}" --body "${{ inputs.version }}"
