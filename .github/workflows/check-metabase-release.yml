@@ -65,6 +65,7 @@ jobs:
         id: compare
         env:
           GH_TOKEN: ${{ github.token }}
+        permissions: read-all
         run: |
           if [ -n "${{ inputs.environment }}" ]; then
             echo "new=true" >> "$GITHUB_OUTPUT"
