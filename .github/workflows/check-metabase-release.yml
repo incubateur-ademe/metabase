@@ -57,22 +57,16 @@ jobs:
     if: needs.check-release.outputs.environments != '[]'
     runs-on: ubuntu-latest
     environment: ${{ matrix.environment }}
-    permissions: read-all
+    permissions: write-all
     strategy:
       matrix:
         environment: ${{ fromJson(needs.check-release.outputs.environments) }}
     steps:
       - name: ⚖️ Compare against last deployed version for this SE
         id: compare
-        env:
-          GH_TOKEN: ${{ github.token }}
+        environment: ${{ matrix.environment }}
         run: |
-          if [ -n "${{ inputs.environment }}" ]; then
-            echo "new=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          last=$(gh api "repos/${{ github.repository }}/environments/${{ matrix.environment }}/variables/LAST_DEPLOYED_METABASE_VERSION" \
-            --jq .value 2>/dev/null || echo "")
+          last=$(vars.LAST_DEPLOYED_METABASE_VERSION)
           echo "Environment: ${{ matrix.environment }}"
           echo "Latest release: ${{ needs.check-release.outputs.latest }}"
           echo "Last deployed:  $last"
