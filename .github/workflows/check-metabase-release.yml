@@ -65,7 +65,7 @@ jobs:
       - name: ⚖️ Compare against last deployed version for this SE
         id: compare
         run: |
-          last=$(vars.LAST_DEPLOYED_METABASE_VERSION)
+          last=${{vars.LAST_DEPLOYED_METABASE_VERSION}}
           echo "Environment: ${{ matrix.environment }}"
           echo "Latest release: ${{ needs.check-release.outputs.latest }}"
           echo "Last deployed:  $last"
