@@ -84,22 +84,24 @@ jobs:
         id: target
         if: steps.compare.outputs.new == 'true'
         env:
+          ENVIRONMENT: ${{ matrix.environment }}
           SCALINGO_GIT_REMOTE: ${{ secrets.SCALINGO_GIT_REMOTE }}
+          # remote looks like git@ssh.<region>.scalingo.com:<app-name>.git
+          REMOTE_PATTERN: '^git@(ssh\.([a-z0-9-]+)\.scalingo\.com):([a-zA-Z0-9._-]+)\.git$'
         run: |
           set -euo pipefail
-          # remote looks like git@ssh.<region>.scalingo.com:<app-name>.git
-          ssh_host=$(printf '%s' "$SCALINGO_GIT_REMOTE" | sed -E 's#^[^@]+@([^:]+):.*#\1#')
-          app=$(printf '%s' "$SCALINGO_GIT_REMOTE" | sed -E 's#.*:([^/]+)\.git#\1#')
-          region=$(printf '%s' "$ssh_host" | sed -E 's#^ssh\.([^.]+)\.scalingo\.com$#\1#')
-
-          # Fail loudly rather than ssh-keyscan'ing a host we did not resolve.
-          case "$ssh_host" in
-            ssh.*.scalingo.com) ;;
-            *) echo "::error::SCALINGO_GIT_REMOTE is malformed for environment ${{ matrix.environment }}: expected git@ssh.<region>.scalingo.com:<app>.git" >&2; exit 1 ;;
-          esac
+          # One anchored match for the whole remote: a partial match must not
+          # yield a half-resolved target. Bail out rather than ssh-keyscan a
+          # host we did not resolve, or build a URL out of unparsed input.
+          if [[ ! "$SCALINGO_GIT_REMOTE" =~ $REMOTE_PATTERN ]]; then
+            echo "::error::SCALINGO_GIT_REMOTE is malformed for environment $ENVIRONMENT: expected git@ssh.<region>.scalingo.com:<app>.git" >&2
+            exit 1
+          fi
+          ssh_host="${BASH_REMATCH[1]}"
+          region="${BASH_REMATCH[2]}"
+          app="${BASH_REMATCH[3]}"
 
           echo "Region: $region"
-          echo "SSH host: $ssh_host"
           {
             echo "ssh_host=$ssh_host"
             echo "app=$app"
