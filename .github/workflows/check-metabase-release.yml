@@ -33,11 +33,14 @@ jobs:
         id: list
         env:
           GH_TOKEN: ${{ github.token }}
+          INPUT_ENVIRONMENT: ${{ inputs.environment }}
+          REPOSITORY: ${{ github.repository }}
         run: |
-          if [ -n "${{ inputs.environment }}" ]; then
-            envs='["${{ inputs.environment }}"]'
+          if [ -n "$INPUT_ENVIRONMENT" ]; then
+            # jq builds the JSON array so a name with a quote cannot break it.
+            envs=$(jq -nc --arg name "$INPUT_ENVIRONMENT" '[$name]')
           else
-            envs=$(gh api "repos/${{ github.repository }}/environments" --paginate \
+            envs=$(gh api "repos/$REPOSITORY/environments" --paginate \
               --jq '[.environments[].name]')
           fi
           echo "environments=$envs" >> "$GITHUB_OUTPUT"
@@ -45,11 +48,13 @@ jobs:
       - name: 📣 Announce release and targets
         env:
           GH_TOKEN: ${{ github.token }}
+          LATEST_TAG: ${{ steps.latest.outputs.tag }}
+          ENVIRONMENTS: ${{ steps.list.outputs.environments }}
         run: |
           {
-            echo "### Metabase ${{ steps.latest.outputs.tag }} — targets: ${{ steps.list.outputs.environments }}"
+            echo "### Metabase $LATEST_TAG, targets: $ENVIRONMENTS"
             echo
-            gh api "repos/metabase/metabase/releases/tags/${{ steps.latest.outputs.tag }}" --jq .body
+            gh api "repos/metabase/metabase/releases/tags/$LATEST_TAG" --jq .body
           } >> "$GITHUB_STEP_SUMMARY"
 
   deploy:
@@ -64,12 +69,15 @@ jobs:
     steps:
       - name: ⚖️ Compare against last deployed version for this SE
         id: compare
+        env:
+          ENVIRONMENT: ${{ matrix.environment }}
+          LAST_DEPLOYED: ${{ vars.LAST_DEPLOYED_METABASE_VERSION }}
+          LATEST: ${{ needs.check-release.outputs.latest }}
         run: |
-          last=${{vars.LAST_DEPLOYED_METABASE_VERSION}}
-          echo "Environment: ${{ matrix.environment }}"
-          echo "Latest release: ${{ needs.check-release.outputs.latest }}"
-          echo "Last deployed:  $last"
-          if [ "$last" != "${{ needs.check-release.outputs.latest }}" ]; then
+          echo "Environment: $ENVIRONMENT"
+          echo "Latest release: $LATEST"
+          echo "Last deployed:  ${LAST_DEPLOYED:-<unset>}"
+          if [ "${LAST_DEPLOYED:-}" != "$LATEST" ]; then
             echo "new=true" >> "$GITHUB_OUTPUT"
           else
             echo "new=false" >> "$GITHUB_OUTPUT"
