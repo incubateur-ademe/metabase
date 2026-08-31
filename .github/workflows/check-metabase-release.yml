@@ -80,15 +80,43 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: 🧭 Resolve Scalingo target from the remote
+        id: target
+        if: steps.compare.outputs.new == 'true'
+        env:
+          SCALINGO_GIT_REMOTE: ${{ secrets.SCALINGO_GIT_REMOTE }}
+        run: |
+          set -euo pipefail
+          # remote looks like git@ssh.<region>.scalingo.com:<app-name>.git
+          ssh_host=$(printf '%s' "$SCALINGO_GIT_REMOTE" | sed -E 's#^[^@]+@([^:]+):.*#\1#')
+          app=$(printf '%s' "$SCALINGO_GIT_REMOTE" | sed -E 's#.*:([^/]+)\.git#\1#')
+          region=$(printf '%s' "$ssh_host" | sed -E 's#^ssh\.([^.]+)\.scalingo\.com$#\1#')
+
+          # Fail loudly rather than ssh-keyscan'ing a host we did not resolve.
+          case "$ssh_host" in
+            ssh.*.scalingo.com) ;;
+            *) echo "::error::SCALINGO_GIT_REMOTE is malformed for environment ${{ matrix.environment }}: expected git@ssh.<region>.scalingo.com:<app>.git" >&2; exit 1 ;;
+          esac
+
+          echo "Region: $region"
+          echo "SSH host: $ssh_host"
+          {
+            echo "ssh_host=$ssh_host"
+            echo "app=$app"
+            echo "region=$region"
+          } >> "$GITHUB_OUTPUT"
+
       - name: 🔑 Set up Scalingo SSH deploy key
         if: steps.compare.outputs.new == 'true'
+        env:
+          SSH_HOST: ${{ steps.target.outputs.ssh_host }}
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.SCALINGO_SSH_PRIVATE_KEY }}" > ~/.ssh/id_scalingo
           chmod 600 ~/.ssh/id_scalingo
-          ssh-keyscan -t rsa,ecdsa,ed25519 ssh.osc-secnum-fr1.scalingo.com >> ~/.ssh/known_hosts
+          ssh-keyscan -t rsa,ecdsa,ed25519 "$SSH_HOST" >> ~/.ssh/known_hosts
           {
-            echo "Host ssh.osc-secnum-fr1.scalingo.com"
+            echo "Host $SSH_HOST"
             echo "  IdentityFile ~/.ssh/id_scalingo"
             echo "  IdentitiesOnly yes"
           } >> ~/.ssh/config
@@ -103,8 +131,4 @@ jobs:
       - name: 🔗 Report deployment URL
         if: steps.compare.outputs.new == 'true'
         run: |
-          remote="${{ secrets.SCALINGO_GIT_REMOTE }}"
-          # remote looks like git@ssh.<region>.scalingo.com:<app-name>.git
-          app=$(echo "$remote" | sed -E 's#.*:([^/]+)\.git#\1#')
-          region=$(echo "$remote" | sed -E 's#git@ssh\.([^.]+)\..*#\1#')
-          echo "### ${{ matrix.environment }}: https://${app}.${region}.scalingo.io" >> "$GITHUB_STEP_SUMMARY"
+          echo "### ${{ matrix.environment }}: https://${{ steps.target.outputs.app }}.${{ steps.target.outputs.region }}.scalingo.io" >> "$GITHUB_STEP_SUMMARY"
